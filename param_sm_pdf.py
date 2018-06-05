@@ -254,7 +254,7 @@ class Processor(object):
             np.sum([(ri - mi) ** 2 for (result, mi) in zip(results, means) for ri in result])
         return ((w * (n - 1) / n + b / n) / w)**0.5
 
-    def process_raw_results(self, result_dict, pl_results, outfile_format='short'):
+    def process_raw_results(self, result_dict, pl_results, outfile_format='full'):
         def __nse(obs, mod):
             mo = np.mean(obs)
             a = np.sum([(mi - oi) ** 2 for mi, oi in zip(mod, obs)])
