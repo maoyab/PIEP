@@ -6,18 +6,22 @@ REFERENCES
     Laio, F., A. Porporato, L. Ridolfi, and I. Rodriguez-Iturbe (2001),
         Plants in water-controlled ecosystems Active role in hydrologic processes and response to water stress II. Probabilistic soil moisture dynamics,
         Adv. Water Resour., 24(7), 707-723, doi 10.1016/S0309-1708(01)00005-7.
-    Dralle, D. N., and S. E. Thompson (2016),
-        A minimalistic probabilistic model for soil moisture in seasonlly dry climates,
-        Water Resour. Res., 52, 1507 - 1517
+    Porporato, A., F. Laio, L. Ridolfi, and I. Rodriguez-Iturbe (2001),
+        Plants in water-controlled ecosystems Active role in hydrologic processes and response to water stress III. Vegetation-water stress,
+        Adv. Water Resour., 24(7), 725-744, doi 10.1016/S0309-1708(01)00006-9.
     Rodriguez-Iturbe, I., V. K. Gupta, and E. Waymire (1984),
         Scale considerations in the modeling of temporal rainfall,
         Water Resour. Res., 20(11), 1611-1619, doi 10.1029/WR020i011p01611.
+    Clapp and Hornberger (1978)
+    Dralle, D. N., and S. E. Thompson (2016),
+        A minimalistic probabilistic model for soil moisture in seasonlly dry climates,
+        Water Resour. Res., 52, 1507 - 1517
 '''
 
 
 class SM_L(object):
     '''
-    From Laio et al., 2001
+    from Laio et al., 2001
     Model  assumptions
     - daily time scale
     - at a point
@@ -28,7 +32,7 @@ class SM_L(object):
     - actual precipitation (Rainfall - Interception) is a censored marked Poisson Process (threshold delta -> lambda_p, alpha_p)
     - between rain events soil moisture loss processes vary within s thresholds: s_fc, s_star, s_w, s_h.
 
-    params definition:
+    parameter definition:
          's_h': relative soil moisture at the hydroscopic point
          's_wilt': relative soil moisture at wilting point
          's_star': relativesoil moisture at incipient stomatal closure
@@ -37,23 +41,25 @@ class SM_L(object):
          'rf_lambda': mean rainfall frequency
          'rf_alpha': mean rainfall depth
          'Zr': (rooting) soil depth
-         'a': a, water retention curve (we dont really care about a except to convert s into potential )
          'b': b, water retention curve (Clapp and Hornberger [1978])
-         'Ks': saturated soil hydraulic conductivity (Rawls et al. [1982])
+         'Ks': saturated soil hydraulic conductivity
          'n': porosity
          'e_max': max ET
-         'e_w': E at s = s_w,  e_w = f_w * e_max
+         'e_w': E at s = s_w,  e_w = f_w * e_t0
+         'et0': reference et 
     '''
 
     def __init__(self, params):
         [self.s_h, self.s_wilt, self.s_star,  self.s_fc,
-         self.e_max, self.f_w,
+         self.f_max, self.f_w, self.et0,
          self.rf_alpha, self.rf_lambda, self.delta,
-         self.a, self.b, self.Ks, self.n, self.Zr] = params
+         self.b, self.Ks, self.n, self.Zr] = params
 
         if self.s_h == self.s_wilt:
             self.f_w = 0.0001
-        self.e_w = self.f_w * self.e_max
+
+        self.e_w = self.f_w * self.et0
+        self.e_max = self.f_max * self.et0
         self.lambda_p = self.get_lambda_p()
 
         self.eta = self.get_eta()
@@ -194,9 +200,9 @@ class SM_L(object):
 class SM_D(object):
 
     '''
-    modified from Dralle, D. N., and S. E. Thompson (2016)
+    modified from Dralle and Thompson, 2016
     Model  assumptions
-    t_d >> 1/lambda: length of dry season constant yuear to year
+    t_d >> 1/lambda: length of dry season constant year to year
     p_w from SM_L
     p_d: negligeable rainfall: exponential decay following s0
     soil moisture thresholds constant within the year
@@ -206,17 +212,18 @@ class SM_D(object):
 
     def __init__(self, params):
         [self.s_h, self.s_wilt, self.s_star, self.s_fc,
-         self.e_max, self.f_w,
+         self.f_max, self.f_w, self.et0,
          self.rf_alpha, self.rf_lambda, self.delta,
-         self.a, self.b, self.Ks, self.n, self.Zr, 
-         self.e_max_dry, self.t_d] = params
+         self.b, self.Ks, self.n, self.Zr,
+         self.et0_dry, self.t_d] = params
 
         self.smpdf_w = SM_L(params[:-2])
         if self.s_h == self.s_wilt:
             self.f_w = 0.0001
-
+        self.e_max_dry = self.f_max * self.et0_dry
+        self.e_w_dry = self.f_w * self.et0_dry
         self.eta_dry = self.smpdf_w.get_eta(e=self.e_max_dry)
-        self.eta_w_dry = self.smpdf_w.get_eta_w(e=self.e_max_dry * self.f_w)
+        self.eta_w_dry = self.smpdf_w.get_eta_w(e=self.e_w_dry)
         self.beta = self.smpdf_w.get_beta()
         self.m = self.smpdf_w.get_m()
 
@@ -227,7 +234,7 @@ class SM_D(object):
         p0d = p0d / np.sum(p0d)
         return p0d
 
-    def get_ps0(self, alternate='simple', s_list_len=100):
+    def get_ps0(self, s_list_len=100):
         ps0 = self.smpdf_w.get_p0(s_list_len=s_list_len)
         return ps0
 
@@ -338,16 +345,23 @@ class SM_D(object):
             return self.__s_h_t(t, t_s_wilti)
 
 
+
 class SM_A(object):
 
     def __init__(self, params):
         self.smpdf_w = SM_L(params[:-2])
         self.smpdf_d = SM_D(params)
-        [self.s_h, self.s_wilt, self.s_star,  self.s_fc,
-         self.e_max, self.f_w,
+
+        [self.s_h, self.s_wilt, self.s_star, self.s_fc,
+         self.f_max, self.f_w, self.et0,
          self.rf_alpha, self.rf_lambda, self.delta,
-         self.a, self.b, self.Ks, self.n, self.Zr, 
-         self.e_max_dry, self.t_d] = params
+         self.b, self.Ks, self.n, self.Zr,
+         self.et0_dry, self.t_d] = params
+
+        self.e_w = self.et0 * self.f_w
+        self.e_max = self.et0 * self.f_max
+        self.e_max_dry = self.et0_dry * self.f_max
+        self.e_w_dry = self.et0_dry * self.f_w
 
     def get_p0(self, s_list_len=100):
         if self.s_fc < 1 \
@@ -371,8 +385,8 @@ class SM_A(object):
 
 
 class Stochastic_rf_char(object):
+    # Rodriguez-Iturbe et al., 1984
     def __init__(self, rf_ts):
-        #Rodriguez-Iturbe [1984]
         self.rf_ts = np.array(rf_ts)
         self.mu = self.get_mu()
         self.var = self.get_var()
