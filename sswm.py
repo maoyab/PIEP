@@ -177,6 +177,30 @@ class SM_L(object):
         else:
             return 0
 
+    def et_losses(self, s):
+        if s > self.s_fc:
+            return self.e_max
+        elif s > self.s_star:
+            return self.e_max
+        elif s > self.s_wilt:
+            return (self.e_max - self.e_w) * (s - self.s_wilt) / (self.s_star - self.s_wilt) + self.e_w 
+        elif s > self.s_h:
+            return self.e_w * (s - self.s_h) / (self.s_wilt - self.s_h)
+        else:
+            return 0
+
+    def stress(self, s, q):
+        if s > self.s_fc:
+            return 0
+        elif s > self.s_star:
+            return 0
+        elif s > self.s_wilt:
+            return ((self.s_star - s) / (self.s_star - self.s_wilt)) ** q
+        elif s > self.s_h:
+            return 1
+        else:
+            return 1
+
     def get_p0(self, s_list_len=100):
         s_list = np.linspace(0., 1., (s_list_len + 1))
 
@@ -195,6 +219,18 @@ class SM_L(object):
             return p0 / c
         else:
             return [0 for s in s_list]
+
+    def get_mean_et(self, p0, s_list_len=100):
+        s_list = np.linspace(0., 1., (s_list_len + 1))
+        e = np.array([self.et_losses(s) for s in s_list])
+        e = e * p0
+        return np.sum(e)
+
+    def get_mean_stress(self, p0, q=2, s_list_len=100):
+        s_list = np.linspace(0., 1., (s_list_len + 1))
+        st = np.array([self.stress(s, q) for s in s_list])
+        st = st * p0
+        return np.sum(st)
 
 
 class SM_D(object):
