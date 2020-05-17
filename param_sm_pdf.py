@@ -199,9 +199,9 @@ class Processor(object):
 
     def check_int_convergeance(self, pl_results0, it, gr_th=1.1, max_num_pl=10):
         pl_results, efficiency = zip(*pl_results0)
-        loglikelihood = [zip(*r)[0] for r in pl_results]
+        loglikelihood = [list(zip(*r))[0] for r in pl_results]
 
-        estimated_params = [zip(*zip(*r)[1]) for r in pl_results]
+        estimated_params = [zip(*list(zip(*r))[1]) for r in pl_results]
         estimated_params = zip(*estimated_params)
 
         gr_lk = self.gelman_rubin_diagnostic([x for x in loglikelihood])
@@ -251,9 +251,9 @@ class Processor(object):
         pl_results, efficiency = zip(*pl_results)
         result_dict['efficiency_estimates'] = efficiency
         result_dict['efficiency'] = np.nanmean(efficiency)
-        loglikelihood = [zip(*r)[0] for r in pl_results]
+        loglikelihood = [list(zip(*r))[0] for r in pl_results]
 
-        estimated_params = [zip(*zip(*r)[1]) for r in pl_results]
+        estimated_params = [zip(*list(zip(*r))[1]) for r in pl_results]
         estimated_params = zip(*estimated_params)
         result_dict['loglikelihood_estimates'] = loglikelihood
         result_dict['loglikelihood'] = np.mean([np.mean(llk) for llk in loglikelihood])
